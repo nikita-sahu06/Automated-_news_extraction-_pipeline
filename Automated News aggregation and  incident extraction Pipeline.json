@@ -1,0 +1,263 @@
+{
+  "name": "Automated News aggregation and  incident extraction Pipeline",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "hours"
+            }
+          ]
+        }
+      },
+      "id": "eae98164-8528-48fc-ac30-df94bb686a8b",
+      "name": "Schedule Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.4,
+      "position": [
+        -64,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "url": "https://newsapi.org/v2/everything?q=(accident OR crash OR collision OR rammed) AND (car OR bike OR truck OR bus OR scooter)&sortBy=publishedAt&language=en&apiKey=bffc7c2c6697494da17ee7907e04fce1",
+        "options": {}
+      },
+      "id": "cf029d8b-3403-484b-9438-ce5f3a06bebd",
+      "name": "HTTP Request",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        160,
+        -208
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "fc544d7e-562f-431e-8bbc-e87f55f81e00",
+              "leftValue": "={{ $json.title }}",
+              "rightValue": "=accident",
+              "operator": {
+                "type": "string",
+                "operation": "contains"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {
+          "ignoreCase": true
+        }
+      },
+      "type": "n8n-nodes-base.filter",
+      "typeVersion": 2.3,
+      "position": [
+        528,
+        -192
+      ],
+      "id": "e84d1e0c-a649-43ee-ba9b-c56aa84c5ee9",
+      "name": "Filter"
+    },
+    {
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "value": "models/gemini-3-flash-preview",
+          "mode": "list",
+          "cachedResultName": "models/gemini-3-flash-preview"
+        },
+        "messages": {
+          "values": [
+            {
+              "content": "=Extract the following details from this news article in valid JSON format:\n{\n  \"city_state\": \"City or State name in India, or Unknown\",\n  \"vehicle_type\": \"Types of vehicles involved e.g. Bike, Truck, Car\",\n  \"dead_count\": \"Number of deaths or 0\",\n  \"injured_count\": \"Number of injured or 0\",\n  \"incident_time\": \"Time like 10 PM, Morning, Night, or Unknown\"\n}\n\nTitle: {{ $json.title }}\nDescription: {{ $json.description }}"
+            }
+          ]
+        },
+        "jsonOutput": true,
+        "builtInTools": {},
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.googleGemini",
+      "typeVersion": 1.2,
+      "position": [
+        656,
+        32
+      ],
+      "id": "890755a1-61c3-4eb0-a460-1c14ce53a276",
+      "name": "Message a model",
+      "credentials": {
+        "googlePalmApi": {
+          "id": null,
+          "name": "",
+          "__aiGatewayManaged": true
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "worksheet",
+        "operation": "append",
+        "workbook": {
+          "__rl": true,
+          "value": "A6D095EFF862B8F0!s3e3ebefdd9334381a9d6a30be8b780d9",
+          "mode": "list",
+          "cachedResultName": "Accidental news_data_analysis",
+          "cachedResultUrl": "https://onedrive.live.com/personal/a6d095eff862b8f0/_layouts/15/doc.aspx?resid=3e3ebefd-d933-4381-a9d6-a30be8b780d9&cid=a6d095eff862b8f0"
+        },
+        "worksheet": {
+          "__rl": true,
+          "value": "{00000000-0001-0000-0000-000000000000}",
+          "mode": "list",
+          "cachedResultName": "Sheet1",
+          "cachedResultUrl": "https://onedrive.live.com/personal/a6d095eff862b8f0/_layouts/15/doc.aspx?resid=3e3ebefd-d933-4381-a9d6-a30be8b780d9&cid=a6d095eff862b8f0&activeCell=Sheet1!A1"
+        },
+        "fieldsUi": {
+          "values": [
+            {
+              "column": "Date",
+              "fieldValue": "={{ $('HTTP Request').item.json.articles[0].publishedAt }}"
+            },
+            {
+              "column": "Headline",
+              "fieldValue": "={{ $('HTTP Request').item.json.articles[0].title }}"
+            },
+            {
+              "column": "url",
+              "fieldValue": "={{ $('HTTP Request').item.json.articles[0].url }}"
+            },
+            {
+              "column": "city_state",
+              "fieldValue": "={{JSON.parse($json.content.parts[0].text.replace(/```json|```/g,'')).city_state }}"
+            },
+            {
+              "column": "Vehicle_type",
+              "fieldValue": "={{JSON.parse($json.content.parts[0].text.replace(/```json|```/g,'')).vehicle_type }}"
+            },
+            {
+              "column": "Dead_count",
+              "fieldValue": "={{JSON.parse($json.content.parts[0].text.replace(/```json|```/g,'')).dead_count }}"
+            },
+            {
+              "column": "Injured_count",
+              "fieldValue": "={{JSON.parse($json.content.parts[0].text.replace(/```json|```/g,'')).injured_count}}"
+            },
+            {
+              "column": "Incident_time",
+              "fieldValue": "={{JSON.parse($json.content.parts[0].text.replace(/```json|```/g,'')).incident_time}}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.microsoftExcel",
+      "typeVersion": 2.2,
+      "position": [
+        1040,
+        32
+      ],
+      "id": "88c4b397-532c-4549-8d63-7d47fe2f2a61",
+      "name": "Append data to sheet",
+      "credentials": {
+        "microsoftExcelOAuth2Api": {
+          "id": "DSxKTymYZYwzGuBm",
+          "name": "Microsoft Excel account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "return $input.first().json.articles.map(article=>({json:article}));"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        352,
+        16
+      ],
+      "id": "46ac401c-ecec-4b48-83e4-9228266253ce",
+      "name": "Code in JavaScript"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter": {
+      "main": [
+        [
+          {
+            "node": "Message a model",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Message a model": {
+      "main": [
+        [
+          {
+            "node": "Append data to sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "Filter",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "7947458e-0939-452a-b4b8-e8cabf104de8",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "70f4afce72a444ba50318b07593d9daf7e0f573162b58535c14fecda34611bec"
+  },
+  "nodeGroups": [],
+  "id": "nfHUKwjVv2ZgZkJM",
+  "tags": []
+}
